@@ -1,0 +1,133 @@
+
+<HTML>
+<HEAD>
+    <META charset="UTF-8">
+    <TITLE>Maze</TITLE>
+
+    <!-- Load matrix functions -->
+    <script src="gl-matrix.js"></script>
+
+    <!-- Load utility functions -->
+    <script src="WebGLHelper.js"> </script>
+
+    <!--JavaScript program-->
+    <script src="Maze.js"> </script>
+
+    <!--vertex shader-->
+    <script id="shader-vs" type="x-shader/x-vertex">
+
+attribute vec4 a_position;
+attribute vec2 a_texCoord;
+attribute vec4 a_color;
+attribute vec3 a_normal;
+
+uniform mat4 u_mvMatrix;
+uniform mat4 u_mvpMatrix;
+uniform mat3 u_normMatrix;
+uniform vec3 u_viewerPosition;
+
+varying vec4 v_color;
+varying vec2 v_texCoord;
+varying vec3 v_normal;
+varying vec3 v_position;
+varying vec3 v_surfaceToView;
+
+void main(void) {
+    gl_Position = u_mvpMatrix * a_position;
+    v_color = a_color;
+    v_texCoord = a_texCoord;
+    v_normal = normalize(vec3(u_normMatrix * a_normal));
+    v_position = vec3(u_mvMatrix * a_position);
+    v_surfaceToView = u_viewerPosition - v_position.xyz;
+}
+</script>
+
+    <!-- fragment shader-->
+    <script id="shader-fs" type="x-shader/x-fragment">
+precision mediump float;
+
+uniform int u_flag;
+
+uniform sampler2D u_texSampler0;
+uniform sampler2D u_texSampler1;
+
+uniform vec3 u_lightPosition[2];
+uniform vec3 u_lightColor;
+uniform vec3 u_ambColor;
+uniform float u_specPower;
+uniform bool u_debug;
+
+varying vec4 v_color;
+varying vec2 v_texCoord;
+varying vec3 v_normal;
+varying vec3 v_position;
+varying vec3 v_surfaceToView;
+
+void main(void) {
+    vec3 norm = normalize(v_normal);
+    vec3 lightDir;
+    float nDotL;
+    for(int i = 0; i < 2; i++) {
+        lightDir = normalize(u_lightPosition[i] - v_position);
+        nDotL += max(dot( lightDir, norm), 0.0);
+    };
+
+    vec4 texColor0 = texture2D(u_texSampler0, v_texCoord);
+    vec4 texColor1 = texture2D(u_texSampler1, v_texCoord);
+
+    //combine vertex colors and texture to get the diffuse color
+    float weight = .75;
+    vec4 color;
+    if (u_flag == 1) {
+        for(int i = 0; i < 4; i++){
+            color[i] = (1.0-weight)*v_color[i] + weight*texColor1[i];
+        }
+    }
+    else {
+        for(int i = 0; i < 4; i++){
+            color[i] = (1.0-weight)*v_color[i] + weight*texColor0[i];
+        }
+    }
+    vec3 diffuse = u_lightColor * color.rgb * nDotL;
+    vec3 ambient = u_ambColor * color.rgb;
+
+    //specular color
+    vec3 halfVector = normalize(lightDir + v_surfaceToView);
+    vec3 specular = pow(dot(norm, halfVector), u_specPower) * u_lightColor;
+
+
+    if(!u_debug){
+	    gl_FragColor = vec4(diffuse + ambient + specular, 1.0);
+        //gl_FragColor = vec4(diffuse + ambient , 1.0);
+        //gl_FragColor = vec4(diffuse, 1.0);
+    }
+    else {
+        //gl_FragColor = v_color;
+	    //average the texture and the color
+        //gl_FragColor = (v_color + texColor) * vec4(0.5, 0.5, 0.5, 0.5);
+
+        //test normals
+        //gl_FragColor = vec4(norm, 1.0);
+
+        //test dot product
+        gl_FragColor = vec4(nDotL, nDotL, nDotL, 1.0);
+
+        //test light color
+        //gl_FragColor = vec4(u_lightColor * nDotL, 1.0);
+    }
+}
+</script>
+
+</HEAD>
+
+<BODY onLoad="glApp.init();">
+<h1>Maze</h1>
+<canvas id="glCanvas" width="750" height="500" style="border:1px solid #000000;">
+    Canvas not supported.
+</canvas><br>
+Controls: W: Forward S: Backward A: Turn left D: Turn right<br>
+Additional Feature: Q: See maze from above E: Return to starting position, Music<br>
+
+</BODY>
+
+</HTML>
